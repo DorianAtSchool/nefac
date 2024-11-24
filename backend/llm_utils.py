@@ -19,16 +19,18 @@ from langchain.chains import StuffDocumentsChain ,LLMChain
 # loaders
 from langchain_community.document_loaders import PyPDFLoader, YoutubeLoader
 from langchain_community.document_loaders.youtube import TranscriptFormat
+from dotenv import load_dotenv
 
-
-
-os.environ["OPENAI_API_KEY"] = ""
+load_dotenv()
+os.environ["OPENAI_API_KEY"] = os.getenv("OPENAI_API_KEY")
 # Initialize embeddings and FAISS vector store
 embedding_model = OpenAIEmbeddings(model="text-embedding-3-small")
 # Initialize docstore -- MAKE PERMANENT FILE
 docstore = InMemoryDocstore({})
 vector_store = FAISS(embedding_function=embedding_model, index = faiss.IndexFlatL2(1536), docstore = docstore, index_to_docstore_id={})  # 768 is the embedding dimension size
 all_docs = []
+conversation_history = []
+
 
 # Add documents to the FAISS vector store
 def add_documents_to_store(_, info, documents):
@@ -64,13 +66,24 @@ def chunk_documents(docs):
 # Function to ask the LLM
 async def ask_llm(_, info, query):
 
-    response = await custom_QA(_, info, query)
+    history_text = "\n".join([
+        f"User: {exchange['question']}\nAssistant: {exchange['answer']}"
+        for exchange in conversation_history[-5:]
+    ]) if conversation_history else "No previous conversation."
+
+
+    response = await custom_QA(_, info, query, history_text)
+
+    conversation_history.append({
+        "question": query,
+        "answer": response['result']
+    })
     
     return response['result']
     
 
 
-async def custom_QA(_, info, query):
+async def custom_QA(_, info, query, history_text=""):
 
     prompt_template = """
 
@@ -85,6 +98,10 @@ async def custom_QA(_, info, query):
         6. Do not provide any information that is not supported by the sources.
         7. Do not provide any information that is not relevant to the question.
         8. Do not hallucinate or make up any information.
+
+        Conversation History:
+            {history}
+
         Sources:
             {context}
 
@@ -94,10 +111,12 @@ async def custom_QA(_, info, query):
         """
 
     retriever = vector_store.as_retriever(
-    search_type="similarity",
-    search_kwargs={"k": 20},
+        search_type="similarity",
+        search_kwargs={"k": 20},
     )
+
     QA_CHAIN_PROMPT = PromptTemplate.from_template(prompt_template) # prompt_template defined above
+
     llm_chain = LLMChain(llm=OpenAI(temperature = 0), prompt=QA_CHAIN_PROMPT, callbacks=None, verbose=True)
     document_prompt = PromptTemplate(
         input_variables=["page_content", "source", "page"],
@@ -116,7 +135,18 @@ async def custom_QA(_, info, query):
         retriever=retriever,
         return_source_documents = True,
     )
-    response = qa(query)
+
+    # Create the input dictionary with all required variables
+    input_dict = {
+        "query": query,
+        "question": query,
+        "history": history_text,  # Add the history text to the input
+        "context": "",  # Context will be populated by the retriever
+    }
+
+    response = qa(input_dict)
+    print(qa.input_keys)
+
 
     print(response)
     return response
