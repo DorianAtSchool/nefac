@@ -67,7 +67,7 @@ def chunk_documents(docs):
 async def ask_llm(_, info, query):
 
     history_text = "\n".join([
-        f"User: {exchange['question']}\nAssistant: {exchange['answer']}"
+        f"User: {exchange['question']}\nChatbot: {exchange['answer']}"
         for exchange in conversation_history[-5:]
     ]) if conversation_history else "No previous conversation."
 
@@ -139,9 +139,7 @@ async def custom_QA(_, info, query, history_text=""):
     # Create the input dictionary with all required variables
     input_dict = {
         "query": query,
-        "question": query,
         "history": history_text,  # Add the history text to the input
-        "context": "",  # Context will be populated by the retriever
     }
 
     response = qa(input_dict)
