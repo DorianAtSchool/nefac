@@ -68,7 +68,7 @@ async def ask_llm(_, info, query):
 
     history_text = "\n".join([
         f"User: {exchange['question']}\nChatbot: {exchange['answer']}"
-        for exchange in conversation_history[-5:]
+        for exchange in conversation_history
     ]) if conversation_history else "No previous conversation."
 
 
@@ -100,7 +100,7 @@ async def custom_QA(_, info, query, history_text=""):
         8. Do not hallucinate or make up any information.
 
         Conversation History:
-            {history}
+            {history_text}
 
         Sources:
             {context}
