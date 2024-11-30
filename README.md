@@ -1,3 +1,8 @@
+# Branch Update:
+
+
+
+
 # RAG Search Application
 
 A full-stack Retrieval Augmented Generation (RAG) application using React, TypeScript, Flask, and Claude.
