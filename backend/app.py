@@ -26,21 +26,9 @@ type_defs = gql("""
     interface Document {
         page_content: String
     }
-
-    type Citation {
-        id: String!
-        context: String!
-    }
-
-    type SearchResult {
-        title: String!
-        link: String!
-        summary: String!
-        citations: [Citation!]!
-    }
             
     type Query {
-        askLlm(prompt: String!, roleFilter: String): [SearchResult!]!
+        askLlm(prompt: String!): String!
         retrieveDocuments(query: String!): [Document]
     }
 
@@ -56,11 +44,9 @@ mutation = MutationType()
 
 # Define the resolvers
 @query.field("askLlm")
-async def resolve_ask_llm(_, info, prompt, roleFilter=None):
+async def resolve_ask_llm(_, info, prompt):
     try:
-        print("Role Filter: ", roleFilter)
-        response = await ask_llm(_, info, prompt, roleFilter)
-        return response
+        return await ask_llm(_, info, prompt)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
