@@ -21,7 +21,7 @@ from langchain.chains import StuffDocumentsChain ,LLMChain
 from langchain_community.llms import OpenAI
 
 # validation
-from langchain_core.pydantic_v1 import BaseModel, Field, validator
+from validation import SearchResponse
 
 # loaders
 from langchain_community.document_loaders import PyPDFLoader, YoutubeLoader
@@ -116,37 +116,38 @@ async def custom_QA(_, info, query, roleFilter=None):
     prompt_template = """
     
     Use the following context to answer the query.
-    
+
     Sources:
     {context}
+
     Instructions:
     - Generate a list of unique relevant sources from the context.
-    - Provide the actual sources of the documents. Titles can be slightly modified for readability. Do not hallucianate or make up any information. All sources start with 'docs/by_...'. Put the path of the source in the 'link' field.
-    - Summarize each source content in a way that answers the query.
-    - Do not include duplicate sources or sources that are not relevant to the query.
-    - Format the output as JSON in the following structure: 
+    - Provide the actual sources of the documents. Titles can be slightly modified for readability. Do not hallucinate or make up any information. All sources start with 'docs/by_...'. Put the path of the source in the 'link' field.
+    - Summarize each source's content in a way that answers the query.
+    - Do not include duplicate or irrelevant sources.
+    - **Return only valid JSON** in the following structure:
+
     {{
         "results": [
             {{
                 "title": "Title of the source",
                 "link": "source path",
-                "summary": " Details answering to the query with full context (who what when why where how)",
+                "summary": "Details answering the query with full context (who, what, when, why, where, how)",
                 "citations": [
-                    {{"id": "1", "context": "relevant quote/text use in summary"}},
+                    {{"id": "1", "context": "Relevant quote/text used in summary"}}
                 ]
             }},
             ...
         ]
     }}
 
-     - Return the JSON object as the final answer.
-     - Format the response as valid JSON. Do not include any text outside the JSON object. Ensure the JSON is properly structured with double quotes and no extraneous characters like newlines or escaped sequences unless necessary for content.
-     - Do not include any new lines
+    - Do not include any text outside the JSON object.
+    - Ensure the JSON is properly structured with double quotes and no extraneous characters.
+    - Do not include any new lines.
 
     Question: {question}
 
     Helpful answer:
-
     """
     
     if roleFilter is None:
@@ -195,87 +196,49 @@ def parse_llm_response(query, response):
 
     # Parse the LLM's JSON response
     try:
+        # Parse the JSON response
         result = json.loads(response['result'])
-        logger.info(f"Parsed LLM response: {result}")
-        return result
-    except Exception as e:
-        # try fixing the response with a fallback logic
+        # Validate the response structure
+        validated_response = SearchResponse(**result)
+        return validated_response.results
+    except (json.JSONDecodeError, ValidationError) as e:
         logger.error(f"Error parsing the LLM response: {e}")
+        
+        # Attempt to fix malformed JSON
         llm = OpenAI(temperature=0)
-        summary_prompt = f"""Fix the following json response such that it will be parsed correctly using json.loads(). 
-        
-        Format the output as JSON in the following structure:
-        
+        fix_prompt = f"""
+        The following JSON response is malformed. Please fix it so that it adheres to the exact structure:
+
         {{
-        "results": [
-            {{
-                "title": "Title of the source",
-                "link": "source path",
-                "summary": " Details answering to the query with full context (who what when why where how)",
-                "citations": [
-                    {{"id": "1", "context": "relevant quote/text use in summary"}},
-                ]
-            }},
-            ...
+            "results": [
+                {{
+                    "title": "string",
+                    "link": "string",
+                    "summary": "string",
+                    "citations": [
+                        {{
+                            "id": "string",
+                            "context": "string"
+                        }}
+                    ]
+                }}
             ]
         }}
 
+        Original response:
+        {response['result']}
 
-        Return the JSON object as the final answer. Format the response as valid JSON. Do not include any text outside the JSON object. Ensure the JSON is properly structured with double quotes and no extraneous characters like newlines or escaped sequences unless necessary for content. Do not include any new lines. 
-        
-        Response: '{response}'
-        Previous error: {e}
-
-        Helpful answer:
-
+        Return only the corrected JSON object without additional text.
         """
-
         try:
-            new_response = llm(summary_prompt).strip()
-            print("Fixed response: ", new_response)
-            
-        except Exception as summ_err:
-            logger.error(f"Error generating summary: {summ_err}")
-            new_response = "reprompting unavailable."
-        
-        try:
-            fixed_response = json.loads(new_response['result'])
-            logger.info(f"Fixed LLM response: {fixed_response}")
-            return fixed_response
-        
+            fixed_response = llm(fix_prompt).strip()
+            result = json.loads(fixed_response)
+            validated_response = SearchResponse(**result)
+            return validated_response.results
         except Exception as fix_err:
-            logger.error(f"Error parsing the fixed LLM response: {fix_err}")
-
-        # Fallback logic
-        formatted_response = {
-            "results": []
-        }
-        unique_titles = set()
-        for i, doc in enumerate(response.get('source_documents', [])):
-            title = doc.metadata.get("title", f"Source {i+1}")
-            if title in unique_titles:
-                continue
-            unique_titles.add(title)
-            # Generate a summary relevant to the query
-            llm = OpenAI(temperature=0)
-            summary_prompt = f"Based on the following content, provide a concise summary that answers the query: '{query}'\n\nContent:\n{doc.page_content}"
-            try:
-                summary = llm(summary_prompt).strip()
-            except Exception as summ_err:
-                logger.error(f"Error generating summary: {summ_err}")
-                summary = "Summary unavailable."
-            formatted_response["results"].append({
-                "title": title,
-                "link": doc.metadata.get("source", "#"),
-                "summary": summary,
-                "citations": [
-                    {
-                        "id": str(i+1),
-                        "context": doc.page_content
-                    }
-                ]
-            })
-        return formatted_response["results"]
+            logger.error(f"Error fixing the LLM response: {fix_err}")
+            # Return an empty list or a default response
+            return []
 
 def filter_docs(all_docs, audience=None, resource_type=None, nefac_category=None):
     filtered_docs = []
