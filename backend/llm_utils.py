@@ -185,7 +185,7 @@ async def custom_QA(_, info, query, roleFilter=None):
         logger.error(f"Error parsing the LLM response: {e} \n\n llm response: {response}")
 
     return response
-
+'''Fix Json response from LLM'''
 def parse_llm_response(query, response):
     try:
         # Clean up the response
@@ -234,6 +234,7 @@ def fix_malformed_json(malformed_json):
         # Return a valid empty response
         return [{"title": "Error", "link": "", "summary": "No results found", "citations": []}]
 
+# Function to filter documents
 def filter_docs(all_docs, audience=None, resource_type=None, nefac_category=None):
     filtered_docs = []
     for doc in all_docs:
