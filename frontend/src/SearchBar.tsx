@@ -131,7 +131,7 @@ const SearchBar = () => {
       )}
 
     {/* Search Form */}
-    <form onSubmit={handleSearch} className="flex gap-2 mb-4">
+    <form onSubmit={handleSearch} className="flex gap-2 mb-4 w-2/3">
       <input
         type="search"
         placeholder="Search"

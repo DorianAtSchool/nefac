@@ -22,6 +22,7 @@ from langchain_community.llms import OpenAI
 
 # validation
 from validation import SearchResponse
+from pydantic import BaseModel, ValidationError
 
 # loaders
 from langchain_community.document_loaders import PyPDFLoader, YoutubeLoader
@@ -84,9 +85,9 @@ def chunk_documents(docs):
 
 # Function to ask the LLM
 async def ask_llm(_, info, query, roleFilter=None):
-
     response = await custom_QA(_, info, query, roleFilter)
-    
+    if response is None:
+        return ['error']
     return response
 
 
@@ -121,7 +122,7 @@ async def custom_QA(_, info, query, roleFilter=None):
     {context}
 
     Instructions:
-    - Generate a list of unique relevant sources from the context.
+    - Generate a list of maximum 2 unique relevant sources (do not overlap sources) from the context.
     - Provide the actual sources of the documents. Titles can be slightly modified for readability. Do not hallucinate or make up any information. All sources start with 'docs/by_...'. Put the path of the source in the 'link' field.
     - Summarize each source's content in a way that answers the query.
     - Do not include duplicate or irrelevant sources.
@@ -193,53 +194,66 @@ async def custom_QA(_, info, query, roleFilter=None):
     return response
 
 def parse_llm_response(query, response):
-
-    # Parse the LLM's JSON response
     try:
-        # Parse the JSON response
-        result = json.loads(response['result'])
-        # Validate the response structure
-        validated_response = SearchResponse(**result)
-        return validated_response.results
-    except (json.JSONDecodeError, ValidationError) as e:
-        logger.error(f"Error parsing the LLM response: {e}")
-        
-        # Attempt to fix malformed JSON
-        llm = OpenAI(temperature=0)
-        fix_prompt = f"""
-        The following JSON response is malformed. Please fix it so that it adheres to the exact structure:
-
-        {{
-            "results": [
-                {{
-                    "title": "string",
-                    "link": "string",
-                    "summary": "string",
-                    "citations": [
-                        {{
-                            "id": "string",
-                            "context": "string"
-                        }}
-                    ]
-                }}
-            ]
-        }}
-
-        Original response:
-        {response['result']}
-
-        Return only the corrected JSON object without additional text.
-        """
-        try:
-            fixed_response = llm(fix_prompt).strip()
-            result = json.loads(fixed_response)
-            validated_response = SearchResponse(**result)
-            return validated_response.results
-        except Exception as fix_err:
-            logger.error(f"Error fixing the LLM response: {fix_err}")
-            # Return an empty list or a default response
+        # Remove any leading/trailing whitespace
+        json_response = response['result'].strip()
+        # Check if the JSON string ends properly
+        if not json_response.endswith('}'):
+            logger.error("LLM response is incomplete or truncated")
             return []
 
+        # Parse the JSON response
+        result = json.loads(json_response)
+        # Validate with Pydantic
+        validated_response = SearchResponse(**result)
+        return validated_response.results
+
+    except (json.JSONDecodeError, ValidationError) as e:
+        logger.error(f"Error parsing the LLM response: {e}")
+
+        # Attempt to fix the JSON
+        fixed_results = fix_malformed_json(response['result'])
+        if fixed_results:
+            return fixed_results
+        else:
+            # Return an empty list to satisfy GraphQL's iterable requirement
+            return []
+def fix_malformed_json(malformed_json):
+    llm = OpenAI(temperature=0)
+    fix_prompt = f"""
+    The following JSON response is malformed. Please fix it so that it adheres to the exact structure:
+
+    {{
+        "results": [
+            {{
+                "title": "string",
+                "link": "string",
+                "summary": "string",
+                "citations": [
+                    {{
+                        "id": "string",
+                        "context": "string"
+                    }}
+                ]
+            }}
+        ]
+    }}
+
+    Original response:
+    {malformed_json}
+
+    Return only the corrected JSON object without additional text.
+    """
+
+    try:
+        fixed_response = llm(fix_prompt).strip()
+        # Parse and validate the fixed JSON
+        result = json.loads(fixed_response)
+        validated_response = SearchResponse(**result)
+        return validated_response.results
+    except Exception as fix_err:
+        logger.error(f"Error fixing the LLM response: {fix_err}")
+        return []
 def filter_docs(all_docs, audience=None, resource_type=None, nefac_category=None):
     filtered_docs = []
     for doc in all_docs:
