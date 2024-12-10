@@ -115,40 +115,33 @@ async def custom_QA(_, info, query, roleFilter=None):
 #         """
     
     prompt_template = """
-    
-    Use the following context to answer the query.
+        Use the following context to answer the query.
 
-    Sources:
-    {context}
+        Sources:
+        {context}
 
-    Instructions:
-    - Generate a list of maximum 2 unique relevant sources (do not overlap sources) from the context.
-    - Provide the actual sources of the documents. Titles can be slightly modified for readability. Do not hallucinate or make up any information. All sources start with 'docs/by_...'. Put the path of the source in the 'link' field.
-    - Summarize each source's content in a way that answers the query.
-    - Do not include duplicate or irrelevant sources.
-    - **Return only valid JSON** in the following structure:
+        Instructions:
+        - Generate a list of unique relevant sources from the context as a search engine.
+        - Provide the actual sources of the documents. Titles can be slightly modified for readability. Do not hallucianate or make up any information. All sources start with 'docs/by_...'. Put the path of the source in the 'link' field.
+        - Summarize each source content in a way that answers the query.
+        - Do not include duplicate sources or sources that are not relevant to the query.
+        - Format the output as JSON in the following structure: 
 
-    {{
-        "results": [
-            {{
-                "title": "Title of the source",
-                "link": "source path",
-                "summary": "Details answering the query with full context (who, what, when, why, where, how)",
-                "citations": [
-                    {{"id": "1", "context": "Relevant quote/text used in summary"}}
-                ]
-            }},
-            ...
-        ]
-    }}
+        {{
+            "results": [
+                {{
+                    "title": "Title of the source",
+                    "link": "source path",
+                    "summary": "Details answering the query.",
+                    "citations": [
+                        {{"id": "1", "context": "Relevant quote used in summary"}}
+                    ]
+                }},
+                ...
+            ]
+        }}
 
-    - Do not include any text outside the JSON object.
-    - Ensure the JSON is properly structured with double quotes and no extraneous characters.
-    - Do not include any new lines.
-
-    Question: {question}
-
-    Helpful answer:
+        Question: {question}
     """
     
     if roleFilter is None:
@@ -195,65 +188,52 @@ async def custom_QA(_, info, query, roleFilter=None):
 
 def parse_llm_response(query, response):
     try:
-        # Remove any leading/trailing whitespace
+        # Clean up the response
         json_response = response['result'].strip()
-        # Check if the JSON string ends properly
-        if not json_response.endswith('}'):
-            logger.error("LLM response is incomplete or truncated")
-            return []
-
-        # Parse the JSON response
+        
+        # Find the last complete JSON structure
+        last_brace = json_response.rfind('}')
+        if last_brace != -1:
+            json_response = json_response[:last_brace + 1]
+        
+        # Try to parse as JSON
         result = json.loads(json_response)
-        # Validate with Pydantic
         validated_response = SearchResponse(**result)
         return validated_response.results
-
+        
     except (json.JSONDecodeError, ValidationError) as e:
-        logger.error(f"Error parsing the LLM response: {e}")
+        logger.error(f"Error parsing LLM response: {e}")
+        return fix_malformed_json(json_response)
 
-        # Attempt to fix the JSON
-        fixed_results = fix_malformed_json(response['result'])
-        if fixed_results:
-            return fixed_results
-        else:
-            # Return an empty list to satisfy GraphQL's iterable requirement
-            return []
 def fix_malformed_json(malformed_json):
-    llm = OpenAI(temperature=0)
-    fix_prompt = f"""
-    The following JSON response is malformed. Please fix it so that it adheres to the exact structure:
+    llm = OpenAI(temperature=0, max_tokens=1000)
+    fix_prompt = """Fix this malformed JSON to match:
+        {
+            "results": [
+                {
+                    "title": "string",
+                    "link": "string", 
+                    "summary": "string",
+                    "citations": [{"id": "string", "context": "string"}]
+                }
+            ]
+        }
 
-    {{
-        "results": [
-            {{
-                "title": "string",
-                "link": "string",
-                "summary": "string",
-                "citations": [
-                    {{
-                        "id": "string",
-                        "context": "string"
-                    }}
-                ]
-            }}
-        ]
-    }}
+        Malformed JSON:
+        %s
 
-    Original response:
-    {malformed_json}
-
-    Return only the corrected JSON object without additional text.
-    """
+        Return only valid JSON.""" % malformed_json
 
     try:
-        fixed_response = llm(fix_prompt).strip()
-        # Parse and validate the fixed JSON
-        result = json.loads(fixed_response)
+        fixed_json = llm(fix_prompt).strip()
+        result = json.loads(fixed_json)
         validated_response = SearchResponse(**result)
         return validated_response.results
-    except Exception as fix_err:
-        logger.error(f"Error fixing the LLM response: {fix_err}")
-        return []
+    except Exception as e:
+        logger.error(f"Could not fix JSON: {e}")
+        # Return a valid empty response
+        return [{"title": "Error", "link": "", "summary": "No results found", "citations": []}]
+
 def filter_docs(all_docs, audience=None, resource_type=None, nefac_category=None):
     filtered_docs = []
     for doc in all_docs:
