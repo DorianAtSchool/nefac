@@ -51,7 +51,7 @@ def format_docs(docs):
         metadata = doc.metadata
         formatted.append(
             f"Title: {metadata['title']}\n"
-            f"Summary: {metadata['summary']}\n"
+            f"Summary: {metadata['title']}\n" # SUMMARY FIELD WE ARE NO LONGER USING
             f"Link: {metadata['source']}\n"
             f"Type: {metadata['type']}\n"
         )
@@ -137,8 +137,8 @@ Retrieved documents (for your reference, not to include in the response):
         search_kwargs={
             "k": NUMBER_OF_NEAREST_NEIGHBORS,
             "lambda_mult": LAMBDA_MULT,
-            "score_threshold": THRESHOLD,
-            "filter": create_vectorstore_filter(roleFilter, contentType, resourceType, seen_documents)
+            "score_threshold": THRESHOLD
+            # "filter": create_vectorstore_filter(roleFilter, contentType, resourceType, seen_documents)
         },
     ).with_config(tags=["retriever"])
 
@@ -228,7 +228,6 @@ Retrieved documents (for your reference, not to include in the response):
                     yield f"data: {data_json}\n\n"
 
             if "retriever" in event["tags"] and event["event"] == "on_retriever_end":
-                logger.info("WE ENDED UP IN THE DOCUMENT OUTPUT")
                 documents = event['data']['output']['documents']
                 formatted_documents = []
                 curr_seen_documents = set()
@@ -237,7 +236,7 @@ Retrieved documents (for your reference, not to include in the response):
                         continue
                     curr_seen_documents.add(doc.metadata["title"])
                     formatted_doc = {
-                        'summary': doc.metadata['summary'],
+                        'summary': doc.metadata['title'], # SUMMARY FIELD WE NO LONGER USING
                         'link': doc.metadata['source'],
                         'type': doc.metadata['type'],
                         'title': doc.metadata['title'],

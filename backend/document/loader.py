@@ -6,8 +6,8 @@ from document.youtube_loader import youtubeLoader
 import pickle
 
 # Define folder paths as placeholders
-WAITING_ROOM_PATH = "backend/docs/waiting_room"
-FINISHED_PATH = "backend/docs/finished_tagging"
+WAITING_ROOM_PATH = "docs/waiting_room"
+FINISHED_PATH = "docs/finished_tagging"
 COPY_DESTINATION_PATH = "../frontend/public/docs"  # New destination path for copying
 
 def load_all_documents():
@@ -37,25 +37,36 @@ def load_all_documents():
         new_doc = pdfLoader(pdf_file, title_to_chunks)
         all_documents.update(new_doc)
         new_docs.update(new_doc)
-        # Copy to the new destination path
-        shutil.copy(pdf_file, os.path.join(COPY_DESTINATION_PATH, os.path.basename(pdf_file)))
-        # Move to finished folder
-        os.rename(pdf_file, os.path.join(FINISHED_PATH, os.path.basename(pdf_file)))
+        shutil.copy(pdf_file, os.path.join(COPY_DESTINATION_PATH, os.path.basename(pdf_file))) # move to frontend for fetching WONT NEED WHEN WE ARE USING NEFAC WEBSITE
+        os.rename(pdf_file, os.path.join(FINISHED_PATH, os.path.basename(pdf_file))) 
 
-    # Process YouTube URLs (each URL in its own .txt file)
-    txt_files = glob.glob(os.path.join(WAITING_ROOM_PATH, "*.txt"))
-    for txt_file in txt_files:
-        with open(txt_file, "r") as f:
-            url = f.read().strip()
-        new_vid = youtubeLoader(url, title_to_chunks, url_to_title)
-        all_documents.update(new_vid)
-        new_docs.update(new_vid)
-        # Copy to the new destination path
-        shutil.copy(txt_file, os.path.join(COPY_DESTINATION_PATH, os.path.basename(txt_file)))
-        # Move to finished folder
-        os.rename(txt_file, os.path.join(FINISHED_PATH, os.path.basename(txt_file)))
-        # Append URL to yt_urls.txt in FINISHED_PATH
-        with open(os.path.join(FINISHED_PATH, "yt_urls.txt"), "a") as yt_file:
-            yt_file.write(url + "\n")  # Append the URL with a newline
+    # Process YouTube URLs
+    yt_urls_file = os.path.join(WAITING_ROOM_PATH, "yt_urls.txt")
+    finished_urls_file = os.path.join(FINISHED_PATH, "yt_urls.txt")
 
+# Read all URLs into memory
+    urls = []
+    if os.path.exists(yt_urls_file):
+        with open(yt_urls_file, "r") as waiting_read:
+            urls = [line.strip() for line in waiting_read if line.strip()]
+
+# Process URLs and collect failed ones
+    failed_urls = []
+    for url in urls:
+        with open(finished_urls_file, "a") as finished:
+            try:
+                new_vid = youtubeLoader(url, title_to_chunks, url_to_title)
+                all_documents.update(new_vid)
+                new_docs.update(new_vid)
+                # Append successful URL to finished file
+                finished.write(url + "\n")
+            except Exception as e:
+                print(f"Error processing YouTube URL {url}: {e}")
+                failed_urls.append(url)
+                continue
+
+    # Rewrite failed URLs to waiting_room/yt_urls.txt
+    with open(yt_urls_file, "w") as waiting_write:
+        for url in failed_urls:
+            waiting_write.write(url + "\n")
     return all_documents, url_to_title, title_to_chunks, new_docs

@@ -27,15 +27,9 @@ def add_all_documents_to_store(vector_store):
     # Keeping track of all document names we have for the future (may not be needed)
     with open('doc_names.pkl', 'wb') as doc_names:
         pickle.dump(all_documents, doc_names)
-    # print(all_documents)
 
     with open('url_to_title.pkl', 'wb') as u2t:
         pickle.dump(url_to_title, u2t)
-    # print(url_to_title)
-
-    with open('title_to_chunks.pkl', 'wb') as t2c:
-        pickle.dump(title_to_chunks, t2c)
-    print(title_to_chunks)
 
     def chunk_documents(docs):
         text_splitter = RecursiveCharacterTextSplitter(chunk_size=512, chunk_overlap=32)
