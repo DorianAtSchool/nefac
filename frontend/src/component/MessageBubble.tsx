@@ -1,4 +1,4 @@
-import { Message } from "../pages/SearchBar";
+import { Message } from "../main/SearchBar";
 import { useEffect } from "react";
 import { SearchResultItem } from "./SearchResultItem";
 import remarkGfm from "remark-gfm";

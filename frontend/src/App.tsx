@@ -1,4 +1,4 @@
-import SearchBar from "./pages/SearchBar";
+import SearchBar from "./main/SearchBar";
 function App() {
   return (
     <div className="App">

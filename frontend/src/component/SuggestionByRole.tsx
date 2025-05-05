@@ -1,6 +1,6 @@
 import React from "react";
 import { SuggestionButton } from "./SuggestionButton";
-import { Message } from "../pages/SearchBar";
+import { Message } from "../main/SearchBar";
 import { FRONTEND_URL } from "../constant/backend";
 
 interface SuggestionByRoleProps {

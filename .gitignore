@@ -1,3 +1,40 @@
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Node/React
+node_modules/
+dist/
+dist-ssr/
+*.local
+coverage/
+build/
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea/
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.swp
+*.swo
+*~
+.settings/
+*.sublime-workspace
+*.sublime-project
+
 # Python
 __pycache__/
 *.py[cod]
@@ -6,7 +43,6 @@ __pycache__/
 .Python
 build/
 develop-eggs/
-dist/
 downloads/
 eggs/
 .eggs/
@@ -32,35 +68,11 @@ env.bak/
 venv.bak/
 
 # Environment Variables
-.env
 .env.local
 .env.development
 .env.test
 .env.production
 .env.*.local
-
-# Node/React
-node_modules/
-coverage/
-build/
-.DS_Store
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-
-# IDE/Editor specific
-.idea/
-.vscode/
-*.swp
-*.swo
-*~
-.settings/
-*.sublime-workspace
-*.sublime-project
 
 # Testing
 .coverage
@@ -72,11 +84,6 @@ nosetests.xml
 coverage.xml
 *.cover
 .hypothesis/
-
-# Log files
-*.log
-logs/
-log/
 
 # Database
 *.db
@@ -92,7 +99,6 @@ log/
 *.pyc
 
 # OS generated files
-.DS_Store
 .DS_Store?
 ._*
 .Spotlight-V100
@@ -115,9 +121,6 @@ Thumbs.db
 # Backup files
 *.bak
 *.backup
-*.swp
-*.swo
-*~
 
 # Security
 *.pem
@@ -125,10 +128,8 @@ Thumbs.db
 *.cert
 *.crt
 
-# Node modules
-node_modules/
-
 # Vite build output
 dist/
 
-# we may need to eventually remove the documents, database, and pkls from the git
+# FAISS store
+backend/faiss_store/

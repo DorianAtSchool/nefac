@@ -52,7 +52,7 @@ export const RoleSelection: React.FC<RoleSelectionProps> = ({
       const vowelStart = ["a", "e", "i", "o", "u"].includes(roleId[0].toLowerCase());
       roleMessage = `I see that you are a${vowelStart ? "n" : ""} ${roleId}. `;
     }
-    return `Welcome to the New England First Amendment Coalition, the region's leading defender of First Amendment freedoms and government transparency. ${roleMessage}You can ask me for NEFAC documents and YouTube vidoes or we can chat about first amendment related topics. How can I help you?`;
+    return `Welcome to the New England First Amendment Coalition, the region's leading defender of First Amendment freedoms and government transparency. ${roleMessage}You can ask me for NEFAC documents and YouTube videos or we can chat about first amendment related topics. How can I help you?`;
   };
 
   return (
