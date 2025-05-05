@@ -25,7 +25,6 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
     prevLength.current = conversation.length;
   }, [conversation.length]);
 
-  // console.log("msg", msg.content);
   return (
     <div className={`flex ${isUser ? "justify-end" : "justify-start"} my-2`}>
       <div
